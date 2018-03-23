@@ -26,3 +26,6 @@ clean: $(TARGET) $(OBJS)
 install:
 	install ./mpw /usr/local/bin
 
+symlink:
+	ln -s $(PWD)/mpw /usr/local/bin/mpw 
+

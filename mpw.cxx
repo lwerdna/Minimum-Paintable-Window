@@ -30,8 +30,8 @@ class MyWin : public Fl_Double_Window
 	int nframes;
 
     public:
-    MyWin(int x, int y, int w_, int h_, bool dofps_):
-        Fl_Double_Window(x, y, w_, h_)
+    MyWin(int x, int y, int w_, int h_, char *title, bool dofps_):
+        Fl_Double_Window(x, y, w_, h_, title)
     {
         printf("MyWin constructor\n");
 
@@ -280,6 +280,7 @@ void cb_fileDescrReady(FL_SOCKET fd, void *cbparam)
 int main(int ac, char **av) {
 	unsigned long width = SIZE_X;
 	unsigned long height = SIZE_Y;
+	char *title;
 	bool fps = false;
 
 	/* arguments */
@@ -288,6 +289,8 @@ int main(int ac, char **av) {
 			width = strtoul(av[i+1], NULL, 10);
 		if(0==strcmp(av[i], "--height") && (i+1)<ac)
 			height = strtoul(av[i+1], NULL, 10);
+		if(0==strcmp(av[i], "--title") && (i+1)<ac)
+			title = av[i+1];
 		if(0==strcmp(av[i], "--fps"))
 			fps = true;		
 	}
@@ -297,7 +300,7 @@ int main(int ac, char **av) {
 
 	/* create the window */
 	printf("creating window sized %lux%lu\n", width, height);
-	Fl_Double_Window *win = new MyWin(POS_X, POS_Y, width, height, fps);
+	Fl_Double_Window *win = new MyWin(POS_X, POS_Y, width, height, title, fps);
 	win->end();
 	win->show(0, NULL);
 
