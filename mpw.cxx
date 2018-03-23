@@ -36,29 +36,35 @@ class MyWin : public Fl_Double_Window
 		int dstW = w();
 		int dstH = h();
 
-		/* horizontal clipping */
-		int spanX = (locX + srcW < dstW) ? srcW : (dstW - locX);
+		/* full screen replacements optimize to a memcpy */
+		if(locX==locY==0 && srcW==dstW && srcH==dstH) {
+			memcpy(canvasData, data, dstW * dstH * 3);
+		}
+		else {
+			/* horizontal clipping */
+			int spanX = (locX + srcW < dstW) ? srcW : (dstW - locX);
 
-		int srcX=0, srcY=0;
-		int dstX=locX, dstY=locY;
-		while(1) {
-			/* south of destination? (vertical clipping) */
-			if(dstY >= dstH)
-				break;
-				
-			/* south of source? */
-			if(srcY >= srcH)
-				break;
+			int srcX=0, srcY=0;
+			int dstX=locX, dstY=locY;
+			while(1) {
+				/* south of destination? (vertical clipping) */
+				if(dstY >= dstH)
+					break;
 
-			int srcIdx = srcX + srcW * srcY;
-			int dstIdx = dstX + dstW * dstY;
+				/* south of source? */
+				if(srcY >= srcH)
+					break;
 
-			printf("copying (%d,%d) -> (%d,%d) (%d bytes)\n",
-				srcX, srcY, dstX, dstY, spanX);
-			memcpy(canvasData + 3*dstIdx, data + 3*srcIdx, 3*spanX);
+				int srcIdx = srcX + srcW * srcY;
+				int dstIdx = dstX + dstW * dstY;
 
-			srcY++;
-			dstY++;
+				printf("copying (%d,%d) -> (%d,%d) (%d bytes)\n",
+					srcX, srcY, dstX, dstY, spanX);
+				memcpy(canvasData + 3*dstIdx, data + 3*srcIdx, 3*spanX);
+
+				srcY++;
+				dstY++;
+			}
 		}
 
 		/* new image from the modified data */
@@ -96,7 +102,7 @@ class MyWin : public Fl_Double_Window
             case FL_KEYUP:
         		printf("KEYUP %d\n", Fl::event_key());
         		rc = 1;
-        		break;        		
+        		break;
             case FL_PASTE:
                 printf("got paste event");
                 printf("event text: %s\n", Fl::event_text());
@@ -108,7 +114,7 @@ class MyWin : public Fl_Double_Window
                 while(0);
                 //printf("got event id: %d\n", event);
         }
-    
+
         return rc;
     }
 
@@ -123,71 +129,13 @@ class MyWin : public Fl_Double_Window
     }
 };
 
-int parseLine(char *line, unsigned long *x, unsigned long *y, unsigned long *w,
-  unsigned long *h, char **data)
-{
-	int rc = -1;
-	char *px, *py, *pw, *ph, *pdata, *endptr;
-	size_t len = 0;
-
-	len = strlen(line); // len was allocated length, not string length
-	while(line[len-1]==0x0d || line[len-1]==0x0a) {
-		line[len-1] = '\0';
-		len -= 1;
-	}
-	/* line should look like:
-		DRAW x,y width,height base64data
-
-		example:
-		DRAW 123,456 30,30 base64datablahblah== */
-	if(strncmp(line, "DRAW ", 5))
-		goto cleanup;
-
-	px = line+5;
-	*x = strtoul(px, &endptr, 10);
-	if(*x==0 && px==endptr)
-		goto cleanup;
-
-	if(*endptr != ',')
-		goto cleanup;
-	py = endptr+1;
-
-	*y = strtoul(py, &endptr, 10);
-	if(*y==0 && (py == endptr))
-		goto cleanup;
-
-	if(*endptr != ' ')
-		goto cleanup;
-	pw = endptr+1;
-
-	*w = strtoul(pw, &endptr, 10);
-	if(*w==0 && pw==endptr)
-		goto cleanup;
-
-	if(*endptr != ',')
-		goto cleanup;
-	ph = endptr+1;
-
-	*h = strtoul(ph, &endptr, 10);
-	if(*h==0 && ph==endptr)
-		goto cleanup;
-
-	if(*endptr != ' ')
-		goto cleanup;
-	*data = endptr+1;
-
-	rc = 0;
-	cleanup:
-	return rc;
-}
-
 void cb_fileDescrReady(FL_SOCKET fd, void *cbparam)
 {
 	uint8_t *data = NULL;
 	char *line = NULL;
 	size_t nalloc = 0;
 	unsigned long x, y, w, h;
-	char *b64;
+	int len;
 	MyWin *win = (MyWin *)cbparam;
 
 	if(getline(&line, &nalloc, stdin) == -1) {
@@ -195,20 +143,74 @@ void cb_fileDescrReady(FL_SOCKET fd, void *cbparam)
 		goto cleanup;
 	}
 
-	if(parseLine(line, &x, &y, &w, &h, &b64)) {
-		printf("ERROR parseline()\n");
-		goto cleanup;
+	len = strlen(line); // len was allocated length, not string length
+	while(line[len-1]==0x0d || line[len-1]==0x0a) {
+		line[len-1] = '\0';
+		len -= 1;
 	}
 
-	data = base64_decode(b64, strlen(b64));
-	if(!data) {
-		printf("ERROR base64_decode()\n");
-		goto cleanup;
-	}
+	/* INSERT command
+		 syntax: INSERT x,y width,height base64data
+		example: INSERT 123,456 30,30 base64datablahblah== */
+	if(strncmp(line, "INSERT ", 7) == 0) {
+		char *px, *py, *pw, *ph, *pdata, *endptr;
+		unsigned long x, y, w, h;
+		uint8_t *data;
 
-	printf("drawing at %lu,%lu size %lu,%lu data: %s\n", x,y,w,h,b64);
-	win->paint(x, y, w, h, data);
-	win->redraw();
+		px = line+7;
+		x = strtoul(px, &endptr, 10);
+		if(x==0 && px==endptr)
+			goto cleanup;
+
+		if(*endptr != ',')
+			goto cleanup;
+		py = endptr+1;
+
+		y = strtoul(py, &endptr, 10);
+		if(y==0 && (py == endptr))
+			goto cleanup;
+
+		if(*endptr != ' ')
+			goto cleanup;
+		pw = endptr+1;
+
+		w = strtoul(pw, &endptr, 10);
+		if(w==0 && pw==endptr)
+			goto cleanup;
+
+		if(*endptr != ',')
+			goto cleanup;
+		ph = endptr+1;
+
+		h = strtoul(ph, &endptr, 10);
+		if(h==0 && ph==endptr)
+			goto cleanup;
+
+		if(*endptr != ' ')
+			goto cleanup;
+		pdata = endptr+1;
+
+		data = base64_decode(pdata, strlen(pdata));
+		if(!data) {
+			printf("ERROR base64_decode()\n");
+			goto cleanup;
+		}
+
+		printf("inserting at %lu,%lu size %lu,%lu data: %s\n", x,y,w,h,pdata);
+		win->paint(x, y, w, h, data);
+	}
+	else
+	/* SHOW command
+		 syntax: "SHOW"
+	*/
+	if(strncmp(line, "SHOW", 4) == 0) {
+		printf("showing double buffer\n");
+		win->redraw();
+	}
+	else
+	{
+		printf("ERROR: parsing incoming line: %s", line);
+	}
 
 	cleanup:
 	if(line)
@@ -217,11 +219,22 @@ void cb_fileDescrReady(FL_SOCKET fd, void *cbparam)
 		free(data);
 }
 
-int main(int argc, char **argv) {
+int main(int ac, char **av) {
+	unsigned long width = SIZE_X;
+	unsigned long height = SIZE_Y;
+
+	for(int i=0; i<ac; ++i) {
+		if(0==strcmp(av[i], "--width") && (i+1)<ac)
+			width = strtoul(av[i+1], NULL, 10);
+		if(0==strcmp(av[i], "--height") && (i+1)<ac)
+			height = strtoul(av[i+1], NULL, 10);
+	}
+
 	/* create the window */
-	Fl_Double_Window *win = new MyWin(POS_X, POS_Y, SIZE_X, SIZE_Y);
+	printf("creating window sized %lux%lu\n", width, height);
+	Fl_Double_Window *win = new MyWin(POS_X, POS_Y, width, height);
 	win->end();
-	win->show(argc, argv);
+	win->show(0, NULL);
 
 	/* set up stdin handler */
 	Fl::add_fd(STDIN_FILENO, FL_READ, cb_fileDescrReady, win);
