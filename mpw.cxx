@@ -50,8 +50,8 @@ class MyWin : public Fl_Double_Window
 		int dstW = w();
 		int dstH = h();
 
-		fprintf(stderr, "locX:%d locY:%d srcW:%d srcH:%d dstW:%d dstH:%d\n",
-			locX, locY, srcW, srcH, dstW, dstH);
+		//fprintf(stderr, "locX:%d locY:%d srcW:%d srcH:%d dstW:%d dstH:%d\n",
+		//	locX, locY, srcW, srcH, dstW, dstH);
 
 		/* full screen replacements optimize to a memcpy */
 		if((locX==0 && locY==0) && (srcW==dstW) && (srcH==dstH)) {
@@ -133,6 +133,8 @@ class MyWin : public Fl_Double_Window
                 //printf("got event id: %d\n", event);
         }
 
+		fflush(stdout);
+
         return rc;
     }
 
@@ -149,7 +151,6 @@ class MyWin : public Fl_Double_Window
 
 			double delta = (double)(tnow.tv_nsec - tlast.tv_nsec) / 1000000000.0;
 			delta += (double)tnow.tv_sec - tlast.tv_sec;			
-			fprintf(stderr, "delta is: %f\n", delta);
 
 			/* if a second has elapsed */
 			if(delta > 1) {
@@ -185,7 +186,7 @@ void cb_fileDescrReady(FL_SOCKET fd, void *cbparam)
 
 
 	nchars = getline(&line, &nalloc, stdin);
-	fprintf(stderr, "getline() returned %zu\n", nchars);
+	//fprintf(stderr, "getline() returned %zu\n", nchars);
 	if(nchars == -1) {
 		fprintf(stderr, "ERROR getline()\n");
 		perror("getline()");
@@ -199,7 +200,7 @@ void cb_fileDescrReady(FL_SOCKET fd, void *cbparam)
 		goto cleanup;
 	}
 
-	fprintf(stderr, "getline() allocated %zu for this\n", nalloc);
+	//fprintf(stderr, "getline() allocated %zu for this\n", nalloc);
 
 	len = strlen(line); // len was allocated length, not string length
 	while(line[len-1]==0x0d || line[len-1]==0x0a) {
@@ -262,7 +263,7 @@ void cb_fileDescrReady(FL_SOCKET fd, void *cbparam)
 		 syntax: "SHOW"
 	*/
 	if(strncmp(line, "SHOW", 4) == 0) {
-		fprintf(stderr, "showing double buffer\n");
+		//fprintf(stderr, "showing double buffer\n");
 		win->redraw();
 	}
 	else

@@ -16,7 +16,7 @@ pokeball_png = '////////////////AAAAAAAAAAAAAAAA////////////////////////AAAAAAAA
 background = '\xFF\xFF\xFF'*width*height;
 backgroundB64 = base64.b64encode(background)
 
-pOpenObj = Popen(['./mpw', '--title', 'Ball Bounce', '--fps', '--width', str(width), '--height', str(height)], stdout=PIPE, stdin=PIPE)
+pOpenObj = Popen(['mpw', '--title', 'Ball Bounce', '--fps', '--width', str(width), '--height', str(height)], stdout=PIPE, stdin=PIPE)
 
 x = 0
 y = 0
